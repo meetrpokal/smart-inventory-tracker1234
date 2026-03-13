@@ -82,11 +82,16 @@ def load_inventory(username):
             with open(INVENTORY_FILE, 'r') as f:
                 all_data = json.load(f)
                 
+                # Check for old format
                 if 'stock' in all_data:
                     old_data = all_data.copy()
                     all_data = {'default_admin': old_data}
-                    with open(INVENTORY_FILE, 'w') as fw:
-                        json.dump(all_data, fw)
+                    # Try to migrate if possible, but don't crash if it's read-only
+                    try:
+                        with open(INVENTORY_FILE, 'w') as fw:
+                            json.dump(all_data, fw)
+                    except Exception:
+                        pass # Read-only filesystem
                         
                 return all_data.get(username, {"stock": {}, "expiry": []})
     except Exception as e:
