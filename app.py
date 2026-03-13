@@ -260,8 +260,8 @@ def logout():
     session.pop('username', None)
     return redirect(url_for('login'))
 
-@app.route('/add_stock'
-@login_required, methods=['POST'])
+@app.route('/add_stock', methods=['POST'])
+@login_required
 def add_stock():
     username = session['username']
     product = request.form['product']
@@ -293,8 +293,8 @@ def add_stock():
         'inventory': data['stock']
     })
 
-@app.route('/remove_stock'
-@login_required, methods=['POST'])
+@app.route('/remove_stock', methods=['POST'])
+@login_required
 def remove_stock():
     username = session['username']
     product = request.form['product']
@@ -330,8 +330,8 @@ def remove_stock():
         'inventory': data['stock']
     })
 
-@app.route('/get_inventory'
-@login_required)
+@app.route('/get_inventory')
+@login_required
 def get_inventory():
     username = session['username']
     data = load_inventory(username)
@@ -374,8 +374,8 @@ def get_inventory():
         'inventory': inventory
     })
 
-@app.route('/check_expiry'
-@login_required)
+@app.route('/check_expiry')
+@login_required
 def check_expiry():
     username = session['username']
     data = load_inventory(username)
@@ -414,8 +414,8 @@ def check_low_stock(threshold):
         'low_stock': low_stock
     })
 
-@app.route('/export_csv'
-@login_required)
+@app.route('/export_csv')
+@login_required
 def export_csv():
     username = session['username']
     data = load_inventory(username)
@@ -456,8 +456,8 @@ def get_cities():
     cities.sort()
     return jsonify({'cities': cities})
 
-@app.route('/find_path'
-@login_required, methods=['POST'])
+@app.route('/find_path', methods=['POST'])
+@login_required
 def find_path():
     username = session['username']
     from_city = request.form['from']
