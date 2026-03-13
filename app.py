@@ -13,7 +13,9 @@ app = Flask(__name__)
 app.secret_key = 'super_secret_inventory_key_123'
 
 # Setup MongoDB Connection
-MONGO_URI = os.getenv("MONGO_URI")
+# Note: For security, it's best to set this in Vercel's Environment Variables.
+# We've encoded '@' as '%40' and '#' as '%23' in your password to ensure the link works.
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://meet:Meet%40%40%23%232026@cluster0.iqpfy8k.mongodb.net/?appName=Cluster0")
 
 if MONGO_URI:
     client = MongoClient(MONGO_URI)
