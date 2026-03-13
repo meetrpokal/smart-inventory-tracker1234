@@ -1,4 +1,6 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
+from werkzeug.security import generate_password_hash, check_password_hash
+from functools import wraps
 import json
 import time
 import os
@@ -8,6 +10,7 @@ from datetime import datetime
 import heapq
 
 app = Flask(__name__)
+app.secret_key = 'super_secret_inventory_key_123'
 
 # Setup MongoDB Connection
 MONGO_URI = os.getenv("MONGO_URI")
@@ -21,29 +24,101 @@ else:
     collection = None
 
 # Temporary storage for inventory data (Local Fallback)
+# Temporary storage for inventory data (Local Fallback)
 INVENTORY_FILE = 'inventory_data.json'
+USERS_FILE = 'users.json'
 
-def load_inventory():
-    # If on Vercel with MongoDB connected
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            if request.path.startswith('/api/') or request.path in ['/get_inventory', '/check_expiry', '/export_csv'] or request.path.startswith('/check_low_stock'):
+                return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def load_users():
     if collection is not None:
-        doc = collection.find_one({"_id": "main_inventory"})
-        if doc:
-            doc.pop('_id', None)
-            return doc
-        return {"stock": {}, "expiry": []}
+        try:
+            doc = collection.find_one({"_id": "users_list"})
+            if doc:
+                return doc.get("users", {})
+        except Exception as e:
+            pass
+    try:
+        if os.path.exists(USERS_FILE):
+            with open(USERS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        pass
+    return {}
+
+def save_users(users_data):
+    if collection is not None:
+        try:
+            collection.update_one({"_id": "users_list"}, {"$set": {"users": users_data}}, upsert=True)
+            return
+        except Exception as e:
+            pass
+    try:
+        with open(USERS_FILE, 'w') as f:
+            json.dump(users_data, f)
+    except Exception as e:
+        pass
+
+def load_inventory(username):
+    if collection is not None:
+        try:
+            doc = collection.find_one({"_id": f"inventory_{username}"})
+            if doc:
+                doc.pop('_id', None)
+                return doc
+        except Exception as e:
+            print(f"Error reading from MongoDB: {e}")
+            
+    try:
+        if os.path.exists(INVENTORY_FILE):
+            with open(INVENTORY_FILE, 'r') as f:
+                all_data = json.load(f)
+                
+                if 'stock' in all_data:
+                    old_data = all_data.copy()
+                    all_data = {'default_admin': old_data}
+                    with open(INVENTORY_FILE, 'w') as fw:
+                        json.dump(all_data, fw)
+                        
+                return all_data.get(username, {"stock": {}, "expiry": []})
+    except Exception as e:
+        print(f"Error reading local JSON: {e}")
         
-    # If running locally without MongoDB
-    if os.path.exists(INVENTORY_FILE):
-        with open(INVENTORY_FILE, 'r') as f:
-            return json.load(f)
     return {"stock": {}, "expiry": []}
 
-def save_inventory(data):
+def save_inventory(username, data):
     if collection is not None:
-        collection.update_one({"_id": "main_inventory"}, {"$set": data}, upsert=True)
-    else:
+        try:
+            collection.update_one({"_id": f"inventory_{username}"}, {"$set": data}, upsert=True)
+            return
+        except Exception as e:
+            print(f"Error writing to MongoDB: {e}")
+    
+    try:
+        all_data = {}
+        if os.path.exists(INVENTORY_FILE):
+            try:
+                with open(INVENTORY_FILE, 'r') as f:
+                    all_data = json.load(f)
+                    if 'stock' in all_data:
+                        old_data = all_data.copy()
+                        all_data = {'default_admin': old_data}
+            except:
+                pass
+                
+        all_data[username] = data
         with open(INVENTORY_FILE, 'w') as f:
-            json.dump(data, f)
+            json.dump(all_data, f)
+    except Exception as e:
+        print(f"Error writing local JSON: {e}")
 
 GUJARAT_GRAPH = {
     "Ahmedabad": {"Gandhinagar": 30, "Surat": 270, "Vadodara": 110, "Rajkot": 215, "Surendranagar": 120, "Nadiad": 55, "Himmatnagar": 85},
@@ -138,16 +213,55 @@ def find_shortest_path(start, end):
     }
 
 @app.route('/')
+@login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', username=session['username'])
 
-@app.route('/add_stock', methods=['POST'])
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        data = request.json
+        username = data.get('username')
+        password = data.get('password')
+        
+        users = load_users()
+        if username in users and check_password_hash(users[username]['password'], password):
+            session['username'] = username
+            return jsonify({'status': 'success'})
+        return jsonify({'status': 'error', 'message': 'Invalid credentials'})
+    return render_template('login.html')
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.json
+    username = data.get('username')
+    password = data.get('password')
+    
+    users = load_users()
+    if username in users:
+        return jsonify({'status': 'error', 'message': 'Organization ID already exists'})
+        
+    users[username] = {
+        'password': generate_password_hash(password)
+    }
+    save_users(users)
+    session['username'] = username
+    return jsonify({'status': 'success'})
+
+@app.route('/logout')
+def logout():
+    session.pop('username', None)
+    return redirect(url_for('login'))
+
+@app.route('/add_stock'
+@login_required, methods=['POST'])
 def add_stock():
+    username = session['username']
     product = request.form['product']
     quantity = int(request.form['quantity'])
     expiry = request.form.get('expiry', '')
     
-    data = load_inventory()
+    data = load_inventory(username)
     
     # Add to stock
     if product in data['stock']:
@@ -164,7 +278,7 @@ def add_stock():
             'expiry': expiry_timestamp
         })
     
-    save_inventory(data)
+    save_inventory(username, data)
     
     return jsonify({
         'status': 'success',
@@ -172,12 +286,14 @@ def add_stock():
         'inventory': data['stock']
     })
 
-@app.route('/remove_stock', methods=['POST'])
+@app.route('/remove_stock'
+@login_required, methods=['POST'])
 def remove_stock():
+    username = session['username']
     product = request.form['product']
     quantity = int(request.form['quantity'])
     
-    data = load_inventory()
+    data = load_inventory(username)
     
     if product not in data['stock'] or data['stock'][product] < quantity:
         return jsonify({
@@ -199,7 +315,7 @@ def remove_stock():
         data['sales'] = []
     data['sales'].append(sale)
     
-    save_inventory(data)
+    save_inventory(username, data)
     
     return jsonify({
         'status': 'success',
@@ -207,9 +323,11 @@ def remove_stock():
         'inventory': data['stock']
     })
 
-@app.route('/get_inventory')
+@app.route('/get_inventory'
+@login_required)
 def get_inventory():
-    data = load_inventory()
+    username = session['username']
+    data = load_inventory(username)
     today = int(time.time())
     
     # Prepare inventory with expiry status
@@ -225,7 +343,7 @@ def get_inventory():
     # Add expiry information
     for item in data.get('expiry', []):
         expiry_date = datetime.fromtimestamp(item['expiry']).strftime('%Y-%m-%d')
-        status = 'Expired' if item['expiry'] <= today else 'Valid'
+        status = f"Expired({item['quantity']})" if item['expiry'] <= today else 'Valid'
         
         # Find if product already in inventory
         found = False
@@ -249,9 +367,11 @@ def get_inventory():
         'inventory': inventory
     })
 
-@app.route('/check_expiry')
+@app.route('/check_expiry'
+@login_required)
 def check_expiry():
-    data = load_inventory()
+    username = session['username']
+    data = load_inventory(username)
     today = int(time.time())
     
     expired = []
@@ -269,8 +389,10 @@ def check_expiry():
     })
 
 @app.route('/check_low_stock/<int:threshold>')
+@login_required
 def check_low_stock(threshold):
-    data = load_inventory()
+    username = session['username']
+    data = load_inventory(username)
     
     low_stock = []
     for product, quantity in data['stock'].items():
@@ -285,9 +407,11 @@ def check_low_stock(threshold):
         'low_stock': low_stock
     })
 
-@app.route('/export_csv')
+@app.route('/export_csv'
+@login_required)
 def export_csv():
-    data = load_inventory()
+    username = session['username']
+    data = load_inventory(username)
     today = int(time.time())
     
     csv_data = "Product,Quantity,Expiry,Status\n"
@@ -299,7 +423,7 @@ def export_csv():
     # Add expiry items
     for item in data.get('expiry', []):
         expiry_date = datetime.fromtimestamp(item['expiry']).strftime('%Y-%m-%d')
-        status = 'Expired' if item['expiry'] <= today else 'Valid'
+        status = f"Expired({item['quantity']})" if item['expiry'] <= today else 'Valid'
         csv_data += f"{item['product']},{item['quantity']},{expiry_date},{status}\n"
     
     with open('inventory_report.csv', 'w') as f:
@@ -325,8 +449,10 @@ def get_cities():
     cities.sort()
     return jsonify({'cities': cities})
 
-@app.route('/find_path', methods=['POST'])
+@app.route('/find_path'
+@login_required, methods=['POST'])
 def find_path():
+    username = session['username']
     from_city = request.form['from']
     to_city = request.form['to']
     
