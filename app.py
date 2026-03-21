@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, send_file, session, redirect, url_for
+import io
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 import json
@@ -420,24 +421,35 @@ def export_csv():
     username = session['username']
     data = load_inventory(username)
     today = int(time.time())
-    
-    csv_data = "Product,Quantity,Expiry,Status\n"
-    
-    # Add stock items
+
+    # Build a merged view of inventory with expiry info
+    inventory_map = {}
     for product, quantity in data['stock'].items():
-        csv_data += f"{product},{quantity},N/A,Valid\n"
-    
-    # Add expiry items
+        inventory_map[product] = {'quantity': quantity, 'expiry': 'N/A', 'status': 'Valid'}
+
     for item in data.get('expiry', []):
         expiry_date = datetime.fromtimestamp(item['expiry']).strftime('%Y-%m-%d')
         status = f"Expired({item['quantity']})" if item['expiry'] <= today else 'Valid'
-        csv_data += f"{item['product']},{item['quantity']},{expiry_date},{status}\n"
-    
-    with open('inventory_report.csv', 'w') as f:
-        f.write(csv_data)
-    
+        if item['product'] in inventory_map:
+            inventory_map[item['product']]['expiry'] = expiry_date
+            inventory_map[item['product']]['status'] = status
+        else:
+            inventory_map[item['product']] = {
+                'quantity': item['quantity'],
+                'expiry': expiry_date,
+                'status': status
+            }
+
+    # Build CSV in memory (avoids write failures on read-only filesystems like Vercel)
+    output = io.StringIO()
+    output.write("Product,Quantity,Expiry,Status\n")
+    for product, info in inventory_map.items():
+        output.write(f"{product},{info['quantity']},{info['expiry']},{info['status']}\n")
+
+    output.seek(0)
     return send_file(
-        'inventory_report.csv',
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
         as_attachment=True,
         download_name='inventory_report.csv'
     )
