@@ -1,85 +1,137 @@
 # Smart Inventory Tracker
 
-An inventory tracker system with web interface and pathfinding capabilities for Gujarat cities. Built with C++ backend and Flask web framework.
+Smart Inventory Tracker is a full-stack web application that helps organizations manage stock, monitor expiry, detect low-stock items, and compute shortest logistics routes between Gujarat cities.
 
-## Features
+This project is designed to demonstrate strong placement-level skills in:
 
-- **Inventory Management**
-  - Add/Remove stock with expiry tracking
-  - Low stock alerts
-  - Expired items detection
-  - CSV export functionality
+- Data structures and algorithms (Dijkstra shortest path)
+- Backend API development (Flask)
+- Frontend integration (HTML, Bootstrap, JavaScript, Chart.js)
+- Authentication and session management
+- Deployment awareness (Vercel + MongoDB Atlas)
 
-- **Advanced Analytics**
-  - Real-time inventory tracking
-  - Demand spike detection
-  - FIFO expiry management
+## Problem Statement
 
-- **Pathfinding System**
-  - Shortest path calculation between Gujarat cities
-  - Interactive web visualization
-  - Dijkstra's algorithm implementation
+Small and medium organizations often struggle to:
+
+- Maintain accurate stock levels
+- Track batch expiry dates
+- Export inventory data for reporting
+- Plan efficient delivery or movement routes
+
+This project provides a single interface to solve these problems with real-time operations and analytics.
+
+## Key Features
+
+1. Authentication
+- Organization-based login and registration
+- Password hashing using Werkzeug
+- Session-protected routes
+
+2. Inventory Operations
+- Add stock with optional expiry date
+- Remove stock with validation
+- Inventory table view with status (Valid / Expired)
+
+3. Monitoring and Reports
+- Check expired items
+- Check low stock for user-defined threshold
+- Export inventory as CSV report
+
+4. Pathfinding Module
+- Find shortest path between Gujarat cities
+- Dijkstra algorithm implementation in Python
+- Path visualization using Chart.js (cumulative distance chart)
+
+5. Storage Strategy
+- Primary: MongoDB Atlas (if MONGO_URI is configured)
+- Fallback: local JSON files (inventory_data.json, users.json)
 
 ## Tech Stack
 
-- **Backend**: C++ (Core logic), Python Flask (Web API)
-- **Frontend**: HTML, CSS, JavaScript, Bootstrap 5
-- **Visualization**: Chart.js
-- **Data**: JSON file storage
+- Backend: Python, Flask
+- Security: Werkzeug password hashing, Flask sessions
+- Frontend: HTML, CSS, JavaScript, Bootstrap 5, Bootstrap Icons
+- Visualization: Chart.js
+- Database: MongoDB Atlas (PyMongo, optional), JSON fallback
+- Deployment: Vercel (Python serverless)
+- Additional module: C++ console implementation (Inventory.cpp)
 
 ## Project Structure
 
 ```
-inventory-tracker/
-├── inventory.cpp         # C++ inventory system
-├── app.py                # Flask web application
-├── templates/
-│   └── index.html        # Web interface
-├── inventory_data.json   # Data storage (auto-generated)
-└── README.md
+inventory_tracker-main/
+|- app.py                  # Flask app with APIs, auth, inventory, pathfinding
+|- Inventory.cpp           # Console-based C++ implementation with similar concepts
+|- inventory_data.json     # Local fallback inventory storage
+|- requirements.txt        # Python dependencies
+|- vercel.json             # Vercel deployment config
+|- templates/
+|  |- login.html           # Login/register UI
+|  |- index.html           # Main dashboard UI
+|- README.md
 ```
 
-## Prerequisites
+## API Endpoints Summary
 
-- C++ compiler (g++)
-- Python 3.x
-- Flask
+- GET / -> Dashboard (login required)
+- GET, POST /login -> Login page + login API
+- POST /register -> Register organization account
+- GET /logout -> End session
+- POST /add_stock -> Add inventory quantity (+optional expiry)
+- POST /remove_stock -> Remove inventory quantity
+- GET /get_inventory -> Get inventory with status
+- GET /check_expiry -> List expired items
+- GET /check_low_stock/<threshold> -> Low-stock items list
+- GET /export_csv -> Download inventory report
+- GET /get_cities -> Supported cities for routing
+- POST /find_path -> Shortest path between selected cities
 
-## Installation & Setup
+## Setup and Run (Local)
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/aarchiie/smart-inventory-tracker.git
-   cd smart-inventory-tracker
-   ```
+1. Clone the repository
 
-2. **Install Python dependencies**
-   ```bash
-   pip install flask
-   ```
+```bash
+git clone <your-repository-url>
+cd inventory_tracker-main
+```
 
-3. **Compile C++ program**
-   ```bash
-   g++ -o inventory inventory.cpp
-   ```
+2. Install dependencies
 
-4. **Create templates directory**
-   ```bash
-   mkdir templates
-   # Move index.html to templates/ folder
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-## Usage
+3. Optional: configure MongoDB Atlas
 
-### Running the Web Application
+- Set environment variable MONGO_URI
+- If not set, app automatically uses local JSON storage
 
-1. **Start the Flask server**
-   ```bash
-   python app.py
-   ```
+4. Run the Flask app
 
-2. **Open browser and navigate to**
-   ```
-   http://localhost:5000
-   ```
+```bash
+python app.py
+```
+
+5. Open in browser
+
+```text
+http://127.0.0.1:5000
+```
+
+## Deployment (Vercel)
+
+This project includes vercel.json for Python deployment.
+
+Build config:
+- Source: app.py
+- Runtime: @vercel/python
+- Route: all traffic redirected to app.py
+
+For production, configure environment variables in Vercel:
+
+- MONGO_URI
+- FLASK_SECRET_KEY (recommended enhancement)
+
+
 
