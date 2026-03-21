@@ -40,8 +40,8 @@ High-level components:
 - Business logic for stock, expiry, and route calculations
 
 3. Data Layer
-- MongoDB Atlas through PyMongo (primary)
-- Local JSON fallback when cloud DB is unavailable
+- MongoDB Atlas through PyMongo (primary, used when `pymongo` is installed and `MONGO_URI` is set)
+- Local JSON fallback when `pymongo` is not installed or the cloud DB is unavailable
 
 4. Algorithm Layer
 - Dijkstra shortest path for weighted graph of Gujarat cities

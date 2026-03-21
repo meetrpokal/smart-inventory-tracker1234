@@ -5,7 +5,10 @@ import json
 import time
 import os
 import re
-from pymongo import MongoClient
+try:
+    from pymongo import MongoClient
+except ImportError:
+    MongoClient = None
 from datetime import datetime
 import heapq
 
@@ -17,7 +20,7 @@ app.secret_key = 'super_secret_inventory_key_123'
 # We've encoded '@' as '%40' and '#' as '%23' in your password to ensure the link works.
 MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://meet:Meet%40%40%23%232026@cluster0.iqpfy8k.mongodb.net/?appName=Cluster0")
 
-if MONGO_URI:
+if MONGO_URI and MongoClient is not None:
     client = MongoClient(MONGO_URI)
     db = client.inventory_db
     collection = db.inventory_data

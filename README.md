@@ -53,7 +53,7 @@ This project provides a single interface to solve these problems with real-time 
 - Security: Werkzeug password hashing, Flask sessions
 - Frontend: HTML, CSS, JavaScript, Bootstrap 5, Bootstrap Icons
 - Visualization: Chart.js
-- Database: MongoDB Atlas (PyMongo), JSON fallback
+- Database: MongoDB Atlas (PyMongo, optional), JSON fallback
 - Deployment: Vercel (Python serverless)
 - Additional module: C++ console implementation (Inventory.cpp)
 
